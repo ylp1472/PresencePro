@@ -143,6 +143,23 @@ def export_attendance():
     output.headers["Content-type"] = "text/csv"
     return output
 
+def get_frame_from_camera():
+    video_capture = cv2.VideoCapture(0)  # 0 is the default camera index
+    if not video_capture.isOpened():
+        print("Error: Camera not found!")
+        return None
+
+    ret, frame = video_capture.read()
+    if not ret:
+        print("Error: Failed to grab frame!")
+        return None
+    
+    # Resize frame for better performance (optional)
+    frame = cv2.resize(frame, (640, 480))
+    
+    # Encode frame as JPEG
+    _, buffer = cv2.imencode('.jpg', frame)
+    return buffer.tobytes()
 
 
 def generate_video_feed():
@@ -155,4 +172,28 @@ def generate_video_feed():
 @app.route('/video_feed')
 def video_feed():
     return Response(generate_video_feed(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+def generate_video_feed():
+    video_capture = cv2.VideoCapture(0)  # Open the camera once
+    if not video_capture.isOpened():
+        print("Error: Camera not found!")
+        return None
+
+    while True:
+        ret, frame = video_capture.read()
+        if not ret:
+            print("Error: Failed to grab frame!")
+            break
+
+        # Resize frame for better performance (optional)
+        frame = cv2.resize(frame, (640, 480))
+
+        # Encode frame as JPEG
+        _, buffer = cv2.imencode('.jpg', frame)
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+
+    # Release the camera after the stream is finished
+    video_capture.release()
+
 
