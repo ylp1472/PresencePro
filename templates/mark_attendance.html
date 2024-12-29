@@ -33,17 +33,35 @@
 </style>
 {% endblock %}
 
-{% block content %}
 <div class="container">
     <h1 class="mb-4 text-center">Mark Attendance Live</h1>
-
-    <div id="video-container" class="mb-4">
-        <img id="video-feed" src="{{ url_for('video_feed') }}" alt="Video Feed">
-    </div>
-
-    <div class="status-container">
-        <p class="status-text">Camera is active and monitoring for faces...</p>
-        <p>Stand in front of the camera to mark your attendance</p>
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <div id="video-container" class="mb-4">
+                        <img id="video-feed" src="{{ url_for('video_feed') }}" 
+                             alt="Video Feed" 
+                             style="width: 100%; height: auto; display: block;">
+                    </div>
+                    <div class="status-container text-center">
+                        <p class="status-text text-success">Camera is active and monitoring for faces...</p>
+                        <p>Stand in front of the camera to mark your attendance</p>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
+
+<script>
+// Add error handling for video feed
+document.getElementById('video-feed').onerror = function() {
+    this.style.display = 'none';
+    document.querySelector('.status-text').innerHTML = 
+        'Error: Camera feed not available. Please check your camera permissions.';
+    document.querySelector('.status-text').classList.remove('text-success');
+    document.querySelector('.status-text').classList.add('text-danger');
+};
+</script>
 {% endblock %}
