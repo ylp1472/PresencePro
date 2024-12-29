@@ -48,43 +48,35 @@ def generate_frames():
         print("Error: Could not open camera")
         return
     
-    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    
-    try:
-        while True:
-            success, frame = camera.read()
-            if not success:
-                break
+    while True:
+        success, frame = camera.read()
+        if not success:
+            break
+        
+        # Process frame for face recognition
+        recognized_students = recognize_faces(frame)
+        
+        # Mark attendance for recognized students
+        for student in recognized_students:
+            today = datetime.now().date()
+            existing_attendance = Attendance.query.filter(
+                Attendance.student_id == student.id,
+                db.func.date(Attendance.timestamp) == today
+            ).first()
             
-            # Process frame for face recognition
-            recognized_students = recognize_faces(frame)
-            
-            # Mark attendance for recognized students
-            for student in recognized_students:
-                # Check if attendance already marked today
-                today = datetime.now().date()
-                existing_attendance = Attendance.query.filter(
-                    Attendance.student_id == student.id,
-                    db.func.date(Attendance.timestamp) == today
-                ).first()
-                
-                if not existing_attendance:
-                    attendance = Attendance(student_id=student.id)
-                    db.session.add(attendance)
-                    try:
-                        db.session.commit()
-                    except Exception as e:
-                        db.session.rollback()
-                        print(f"Error marking attendance: {e}")
-            
-            # Encode frame
-            ret, buffer = cv2.imencode('.jpg', frame)
-            frame = buffer.tobytes()
-            yield (b'--frame\r\n'
-                  b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-    finally:
-        camera.release()
+            if not existing_attendance:
+                attendance = Attendance(student_id=student.id)
+                db.session.add(attendance)
+                try:
+                    db.session.commit()
+                except Exception as e:
+                    db.session.rollback()
+                    print(f"Error marking attendance: {e}")
+        
+        ret, buffer = cv2.imencode('.jpg', frame)
+        frame = buffer.tobytes()
+        yield (b'--frame\r\n'
+              b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
 
 @app.route('/video_feed')
 def video_feed():
@@ -92,6 +84,7 @@ def video_feed():
         generate_frames(),
         mimetype='multipart/x-mixed-replace; boundary=frame'
     )
+
 
 @app.route('/check_status')
 def check_status():
