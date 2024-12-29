@@ -11,6 +11,7 @@
         border: 2px solid #ddd;
         border-radius: 8px;
         overflow: hidden;
+        background-color: #f8f9fa;
     }
     #video-feed {
         width: 100%;
@@ -29,6 +30,27 @@
         font-size: 1.2em;
         margin-bottom: 10px;
     }
+    .error-message {
+        color: #dc3545;
+        display: none;
+        padding: 10px;
+        margin-top: 10px;
+        border-radius: 4px;
+        background-color: #f8d7da;
+    }
+    .loading-spinner {
+        display: inline-block;
+        width: 30px;
+        height: 30px;
+        border: 3px solid rgba(0, 0, 0, 0.3);
+        border-radius: 50%;
+        border-top-color: #007bff;
+        animation: spin 1s ease-in-out infinite;
+        margin-right: 10px;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
 </style>
 {% endblock %}
 
@@ -37,9 +59,16 @@
     <h1 class="mb-4 text-center">Mark Attendance Live</h1>
     <div id="video-container" class="mb-4">
         <img id="video-feed" src="{{ url_for('video_feed') }}" alt="Video Feed">
+        <div id="error-message" class="error-message">
+            Camera access error. Please check your permissions and refresh the page.
+        </div>
+        <div id="loading-message" class="status-text">
+            <div class="loading-spinner"></div>
+            Loading video feed...
+        </div>
     </div>
     <div class="status-container">
-        <p class="status-text">Camera is active and monitoring for faces...</p>
+        <p id="camera-status" class="status-text">Initializing camera...</p>
         <p id="attendance-status">Stand in front of the camera to mark your attendance</p>
     </div>
 </div>
@@ -47,29 +76,53 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const videoFeed = document.getElementById('video-feed');
-    const statusText = document.querySelector('.status-text');
+    const errorMessage = document.getElementById('error-message');
+    const loadingMessage = document.getElementById('loading-message');
+    const cameraStatus = document.getElementById('camera-status');
     const attendanceStatus = document.getElementById('attendance-status');
+    
+    // Handle video feed loading
+    videoFeed.onloadstart = function() {
+        loadingMessage.style.display = 'block';
+        videoFeed.style.display = 'none';
+        errorMessage.style.display = 'none';
+    };
     
     // Handle video feed errors
     videoFeed.onerror = function() {
         videoFeed.style.display = 'none';
-        statusText.textContent = 'Error: Camera not available';
-        statusText.classList.add('text-danger');
-        attendanceStatus.textContent = 'Please check your camera permissions and refresh the page';
+        loadingMessage.style.display = 'none';
+        errorMessage.style.display = 'block';
+        cameraStatus.textContent = 'Error: Camera not available';
+        cameraStatus.style.color = '#dc3545';
+    };
+    
+    // Handle video feed load success
+    videoFeed.onload = function() {
+        errorMessage.style.display = 'none';
+        loadingMessage.style.display = 'none';
+        videoFeed.style.display = 'block';
+        cameraStatus.textContent = 'Camera is active and monitoring for faces...';
+        cameraStatus.style.color = '#28a745';
     };
     
     // Check attendance status periodically
     function checkAttendanceStatus() {
-        fetch('{{ url_for("check_status") }}')  // Updated route name
+        fetch('{{ url_for("check_status") }}')
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
                     attendanceStatus.textContent = data.message + ' at ' + data.timestamp;
-                    statusText.textContent = 'Attendance Marked Successfully!';
+                    attendanceStatus.style.color = '#28a745';
+                } else if (data.status === 'waiting') {
+                    attendanceStatus.textContent = data.message;
+                    attendanceStatus.style.color = '#007bff';
                 }
             })
             .catch(error => {
                 console.error('Error checking attendance status:', error);
+                attendanceStatus.textContent = 'Error checking attendance status. Please try again.';
+                attendanceStatus.style.color = '#dc3545';
             });
     }
     
