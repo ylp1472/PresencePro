@@ -141,3 +141,8 @@ def export_attendance():
     output.headers["Content-Disposition"] = f"attachment; filename=attendance_{start_date.date()}_to_{end_date.date()}.csv"
     output.headers["Content-type"] = "text/csv"
     return output
+
+@app.route('/video_feed')
+def video_feed():
+    # Your logic for generating the video stream goes here.
+    return Response(generate_video_feed(), mimetype='multipart/x-mixed-replace; boundary=frame')
