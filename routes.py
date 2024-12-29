@@ -8,6 +8,7 @@ import numpy as np
 from datetime import datetime
 import csv
 from io import StringIO
+from flask import Response
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -141,3 +142,17 @@ def export_attendance():
     output.headers["Content-Disposition"] = f"attachment; filename=attendance_{start_date.date()}_to_{end_date.date()}.csv"
     output.headers["Content-type"] = "text/csv"
     return output
+
+
+
+def generate_video_feed():
+    # Replace with your video feed logic
+    while True:
+        frame = get_frame_from_camera()  # Implement this function
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(generate_video_feed(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
