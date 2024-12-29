@@ -1,37 +1,83 @@
-<!-- templates/mark_attendance.html -->
 {% extends "base.html" %}
 {% block title %}Mark Attendance Live{% endblock %}
+
+{% block extra_css %}
+<style>
+    #video-container {
+        position: relative;
+        width: 100%;
+        max-width: 640px;
+        margin: 0 auto;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    #video-feed {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+    .status-container {
+        margin-top: 20px;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        text-align: center;
+    }
+    .status-text {
+        color: #28a745;
+        font-size: 1.2em;
+        margin-bottom: 10px;
+    }
+    .error-text {
+        color: #dc3545;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="container">
     <h1 class="mb-4 text-center">Mark Attendance Live</h1>
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-body">
-                    <div id="video-container" class="mb-4">
-                        <img id="video-feed" src="{{ url_for('video_feed') }}" 
-                             alt="Video Feed" 
-                             style="width: 100%; height: auto; display: block;">
-                    </div>
-                    <div class="status-container text-center">
-                        <p class="status-text text-success">Camera is active and monitoring for faces...</p>
-                        <p>Stand in front of the camera to mark your attendance</p>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div id="video-container" class="mb-4">
+        <img id="video-feed" src="{{ url_for('video_feed') }}" alt="Video Feed">
+    </div>
+    <div class="status-container">
+        <p class="status-text">Camera is active and monitoring for faces...</p>
+        <p id="attendance-status">Stand in front of the camera to mark your attendance</p>
     </div>
 </div>
 
 <script>
-// Add error handling for video feed
-document.getElementById('video-feed').onerror = function() {
-    this.style.display = 'none';
-    document.querySelector('.status-text').innerHTML = 
-        'Error: Camera feed not available. Please check your camera permissions.';
-    document.querySelector('.status-text').classList.remove('text-success');
-    document.querySelector('.status-text').classList.add('text-danger');
-};
+document.addEventListener('DOMContentLoaded', function() {
+    const videoFeed = document.getElementById('video-feed');
+    const statusText = document.querySelector('.status-text');
+    const attendanceStatus = document.getElementById('attendance-status');
+    
+    // Handle video feed errors
+    videoFeed.onerror = function() {
+        videoFeed.style.display = 'none';
+        statusText.textContent = 'Error: Camera not available';
+        statusText.classList.add('error-text');
+        attendanceStatus.textContent = 'Please check your camera permissions and refresh the page';
+    };
+    
+    // Check attendance status periodically
+    function checkAttendanceStatus() {
+        fetch('{{ url_for("check_attendance_status") }}')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    attendanceStatus.textContent = data.message + ' at ' + data.timestamp;
+                    statusText.textContent = 'Attendance Marked Successfully!';
+                }
+            })
+            .catch(error => {
+                console.error('Error checking attendance status:', error);
+            });
+    }
+    
+    // Check status every 3 seconds
+    setInterval(checkAttendanceStatus, 3000);
+});
 </script>
 {% endblock %}
