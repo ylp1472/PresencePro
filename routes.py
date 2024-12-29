@@ -43,59 +43,73 @@ def mark_attendance():
     return render_template('mark_attendance.html')
 
 def generate_frames():
-    camera = cv2.VideoCapture(0)  # Use 0 for default camera
+    camera = cv2.VideoCapture(0)
+    if not camera.isOpened():
+        print("Error: Could not open camera")
+        return
     
-    while True:
-        success, frame = camera.read()
-        if not success:
-            break
-        else:
+    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    
+    try:
+        while True:
+            success, frame = camera.read()
+            if not success:
+                break
+            
             # Process frame for face recognition
             recognized_students = recognize_faces(frame)
             
-            # Draw rectangles around recognized faces
+            # Mark attendance for recognized students
             for student in recognized_students:
-                # Add text with student name
-                cv2.putText(frame, student.name, (50, 50), 
-                          cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                # Check if attendance already marked today
+                today = datetime.now().date()
+                existing_attendance = Attendance.query.filter(
+                    Attendance.student_id == student.id,
+                    db.func.date(Attendance.timestamp) == today
+                ).first()
                 
-                # Mark attendance for recognized students
-                attendance = Attendance(student_id=student.id)
-                db.session.add(attendance)
-                db.session.commit()
+                if not existing_attendance:
+                    attendance = Attendance(student_id=student.id)
+                    db.session.add(attendance)
+                    try:
+                        db.session.commit()
+                    except Exception as e:
+                        db.session.rollback()
+                        print(f"Error marking attendance: {e}")
             
-            # Encode frame to jpg format
+            # Encode frame
             ret, buffer = cv2.imencode('.jpg', frame)
             frame = buffer.tobytes()
             yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-    
-    camera.release()
+                  b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+    finally:
+        camera.release()
 
 @app.route('/video_feed')
 def video_feed():
-    return Response(generate_frames(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    return Response(
+        generate_frames(),
+        mimetype='multipart/x-mixed-replace; boundary=frame'
+    )
 
-@app.route('/process_attendance', methods=['POST'])
-@login_required
-def process_attendance():
-    if 'image' not in request.files:
-        return 'No image file', 400
+@app.route('/check_status')
+def check_status():
+    today = datetime.now().date()
+    recent_attendance = Attendance.query.filter(
+        db.func.date(Attendance.timestamp) == today
+    ).order_by(Attendance.timestamp.desc()).first()
     
-    file = request.files['image']
-    npimg = np.fromfile(file, np.uint8)
-    img = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
-    
-    recognized_students = recognize_faces(img)
-    
-    for student in recognized_students:
-        attendance = Attendance(student_id=student.id)
-        db.session.add(attendance)
-    
-    db.session.commit()
-    
-    return jsonify([student.name for student in recognized_students])
+    if recent_attendance:
+        return jsonify({
+            'status': 'success',
+            'message': f'Attendance marked for {recent_attendance.student.name}',
+            'timestamp': recent_attendance.timestamp.strftime('%H:%M:%S')
+        })
+    return jsonify({
+        'status': 'waiting',
+        'message': 'Waiting for face detection...'
+    })
 
 @app.route('/student_management')
 @login_required
@@ -177,7 +191,6 @@ def export_attendance():
     output.headers["Content-type"] = "text/csv"
     return output
 
-# Error handlers
 @app.errorhandler(404)
 def not_found_error(error):
     return render_template('404.html'), 404
