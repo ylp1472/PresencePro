@@ -1,4 +1,4 @@
-from flask import render_template, url_for, flash, redirect, request, jsonify, make_response
+from flask import render_template, url_for, flash, redirect, request, jsonify, make_response, Response
 from flask_login import login_user, current_user, logout_user, login_required
 from app import app, db, bcrypt
 from models import Admin, Student, Attendance
@@ -8,7 +8,6 @@ import numpy as np
 from datetime import datetime
 import csv
 from io import StringIO
-from flask import Response
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -42,6 +41,41 @@ def dashboard():
 @login_required
 def mark_attendance():
     return render_template('mark_attendance.html')
+
+def generate_frames():
+    camera = cv2.VideoCapture(0)  # Use 0 for default camera
+    
+    while True:
+        success, frame = camera.read()
+        if not success:
+            break
+        else:
+            # Process frame for face recognition
+            recognized_students = recognize_faces(frame)
+            
+            # Draw rectangles around recognized faces
+            for student in recognized_students:
+                # Add text with student name
+                cv2.putText(frame, student.name, (50, 50), 
+                          cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                
+                # Mark attendance for recognized students
+                attendance = Attendance(student_id=student.id)
+                db.session.add(attendance)
+                db.session.commit()
+            
+            # Encode frame to jpg format
+            ret, buffer = cv2.imencode('.jpg', frame)
+            frame = buffer.tobytes()
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+    
+    camera.release()
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(generate_frames(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @app.route('/process_attendance', methods=['POST'])
 @login_required
@@ -143,57 +177,12 @@ def export_attendance():
     output.headers["Content-type"] = "text/csv"
     return output
 
-def get_frame_from_camera():
-    video_capture = cv2.VideoCapture(0)  # 0 is the default camera index
-    if not video_capture.isOpened():
-        print("Error: Camera not found!")
-        return None
+# Error handlers
+@app.errorhandler(404)
+def not_found_error(error):
+    return render_template('404.html'), 404
 
-    ret, frame = video_capture.read()
-    if not ret:
-        print("Error: Failed to grab frame!")
-        return None
-    
-    # Resize frame for better performance (optional)
-    frame = cv2.resize(frame, (640, 480))
-    
-    # Encode frame as JPEG
-    _, buffer = cv2.imencode('.jpg', frame)
-    return buffer.tobytes()
-
-
-def generate_video_feed():
-    # Replace with your video feed logic
-    while True:
-        frame = get_frame_from_camera()  # Implement this function
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-
-@app.route('/video_feed')
-def video_feed():
-    return Response(generate_video_feed(), mimetype='multipart/x-mixed-replace; boundary=frame')
-
-def generate_video_feed():
-    video_capture = cv2.VideoCapture(0)  # Open the camera once
-    if not video_capture.isOpened():
-        print("Error: Camera not found!")
-        return None
-
-    while True:
-        ret, frame = video_capture.read()
-        if not ret:
-            print("Error: Failed to grab frame!")
-            break
-
-        # Resize frame for better performance (optional)
-        frame = cv2.resize(frame, (640, 480))
-
-        # Encode frame as JPEG
-        _, buffer = cv2.imencode('.jpg', frame)
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-
-    # Release the camera after the stream is finished
-    video_capture.release()
-
-
+@app.errorhandler(500)
+def internal_error(error):
+    db.session.rollback()
+    return render_template('500.html'), 500
