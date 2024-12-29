@@ -29,9 +29,6 @@
         font-size: 1.2em;
         margin-bottom: 10px;
     }
-    .error-text {
-        color: #dc3545;
-    }
 </style>
 {% endblock %}
 
@@ -57,13 +54,13 @@ document.addEventListener('DOMContentLoaded', function() {
     videoFeed.onerror = function() {
         videoFeed.style.display = 'none';
         statusText.textContent = 'Error: Camera not available';
-        statusText.classList.add('error-text');
+        statusText.classList.add('text-danger');
         attendanceStatus.textContent = 'Please check your camera permissions and refresh the page';
     };
     
     // Check attendance status periodically
     function checkAttendanceStatus() {
-        fetch('{{ url_for("check_attendance_status") }}')
+        fetch('{{ url_for("check_status") }}')  // Updated route name
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
