@@ -1,38 +1,8 @@
+<!-- templates/mark_attendance.html -->
 {% extends "base.html" %}
-
 {% block title %}Mark Attendance Live{% endblock %}
 
-{% block extra_css %}
-<style>
-    #video-container {
-        position: relative;
-        width: 100%;
-        max-width: 640px;
-        margin: 0 auto;
-        border: 2px solid #ddd;
-        border-radius: 8px;
-        overflow: hidden;
-    }
-    #video-feed {
-        width: 100%;
-        height: auto;
-        display: block;
-    }
-    .status-container {
-        margin-top: 20px;
-        padding: 15px;
-        background-color: #f8f9fa;
-        border-radius: 8px;
-        text-align: center;
-    }
-    .status-text {
-        color: #28a745;
-        font-size: 1.2em;
-        margin-bottom: 10px;
-    }
-</style>
-{% endblock %}
-
+{% block content %}
 <div class="container">
     <h1 class="mb-4 text-center">Mark Attendance Live</h1>
     <div class="row justify-content-center">
