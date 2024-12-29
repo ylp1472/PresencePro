@@ -1,7 +1,7 @@
+import face_recognition
 import cv2
 import numpy as np
 from models import Student
-import face_recognition
 
 def encode_face(image_file):
     image = face_recognition.load_image_file(image_file)
@@ -37,15 +37,3 @@ def recognize_faces(frame):
                 recognized_students.append(student)
     
     return recognized_students
-
-def generate_video_feed():
-    video_capture = cv2.VideoCapture(0)
-    while True:
-        success, frame = video_capture.read()
-        if not success:
-            break
-        _, buffer = cv2.imencode('.jpg', frame)
-        frame = buffer.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-    video_capture.release()
